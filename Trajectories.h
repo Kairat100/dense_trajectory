@@ -36,7 +36,7 @@ void ClearTrackPoints(const int length)
 	outfile2.close();
 }
 
-void SaveTrackPointsForDebug(const std::vector<Point2f>& point, const int length, const float scale, int frame_num)
+void SaveTrackPointsForDebug(const std::vector<Point2f>& point, const int length, int frame_num)
 {
 	std::ofstream outfile;
 	outfile.open("out_of_tracks_debug.txt", std::ios_base::app);
@@ -45,8 +45,7 @@ void SaveTrackPointsForDebug(const std::vector<Point2f>& point, const int length
 
 	for (int j = 0; j <= length; j++)
 	{
-		Point2f point0 = point[j];
-		point0 *= scale;
+		Point2f point0 = point[j];		
 
 		outfile << point0.x << "\t";;
 		outfile << point0.y << "\t";;
@@ -68,25 +67,25 @@ void SaveTrackPoints(const std::vector<Point2f>& point, std::vector<Point2f> tra
 	outfile << var_x << "\t";
 	outfile << var_y << "\t";
 	
-	/*
 	for (int i = 0; i < length; ++i)
 	{
 		outfile << trajectory[i].x << "\t";
 		outfile << trajectory[i].y << "\t";
-	}*/
-    
+	}
+	
+    /*
 	for (int j = 0; j <= length; j++)
 	{
 		Point2f point0 = point[j];
 
 		outfile << point0.x << "\t";;
 		outfile << point0.y << "\t";;
-	}
+	}*/
 
 	outfile << std::endl;
 	outfile.close();
 
-	//SaveTrackPointsForDebug(point, length, scale, frame_num);
+	SaveTrackPointsForDebug(point, length, frame_num);
 }
 
 #endif /*TRAJECTORIES_H_*/

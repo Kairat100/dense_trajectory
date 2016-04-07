@@ -3,12 +3,14 @@
 #include "Descriptors.h"
 #include "OpticalFlow.h"
 #include "Trajectories.h"
+#include "Constants.h"
+#include "TrajHandSegm.h"
 
 #include <time.h>
 
 using namespace cv;
 
-int show_track = 1; // set show_track = 1, if you want to visualize the trajectories
+int show_track = 0; // set show_track = 1, if you want to visualize the trajectories
 
 int main(int argc, char** argv)
 {
@@ -105,55 +107,63 @@ int main(int argc, char** argv)
 		// track feature points
 		for (std::list<Track>::iterator iTrack = xyTracks.begin(); iTrack != xyTracks.end(); ++iTrack)
 		{
-			int index = iTrack->index;
-
-			Point2f prev_point = iTrack->point[index];
-			int x = std::min<int>(std::max<int>(cvRound(prev_point.x), 0), width-1);
-			int y = std::min<int>(std::max<int>(cvRound(prev_point.y), 0), height-1);
-
-			Point2f point;
-			point.x = prev_point.x + flow.ptr<float>(y)[2*x];
-			point.y = prev_point.y + flow.ptr<float>(y)[2*x+1];
-
-//			printf("%f\n", point.x = prev_point.x);
-
-
-			if(point.x <= 0 || point.x >= width || point.y <= 0 || point.y >= height)
+			if(iTrack->tracking == true)
 			{
-				iTrack = xyTracks.erase(iTrack);
-//				iTrack->tracking = false;
-				continue;
-			}
+				int index = iTrack->index;
 
-			iTrack->addPoint(point);
+				Point2f prev_point = iTrack->point[index];
+				int x = std::min<int>(std::max<int>(cvRound(prev_point.x), 0), width-1);
+				int y = std::min<int>(std::max<int>(cvRound(prev_point.y), 0), height-1);
 
-			
+				Point2f point;
+				point.x = prev_point.x + flow.ptr<float>(y)[2*x];
+				point.y = prev_point.y + flow.ptr<float>(y)[2*x+1];
+
+				//	printf("%f\n", point.x = prev_point.x);
 
 
-			// if the trajectory achieves the maximal length
-			if(iTrack->index >= trackInfo.length)
-			{
-				// draw the trajectories at the first scale
-				if(show_track == 1)
-					DrawTrack(iTrack->point, iTrack->index, 1.0, 10, image);
-
-				std::vector<Point2f> trajectory(trackInfo.length+1);
-
-				for(int i = 0; i <= trackInfo.length; ++i)
-					trajectory[i] = iTrack->point[i];
-
-				float mean_x(0), mean_y(0), var_x(0), var_y(0), length(0);
-				
-				if(IsValid(trajectory, mean_x, mean_y, var_x, var_y, length))
-				{                       
-					//SaveTrackPoints(iTrack->point, trajectory, trackInfo.length, mean_x, mean_y, var_x, var_y, frame_num);
+				if(point.x <= 0 || point.x >= width || point.y <= 0 || point.y >= height)
+				{
+					iTrack = xyTracks.erase(iTrack);
+					continue;
 				}
 
-				SaveTrackPoints(iTrack->point, trajectory, trackInfo.length, mean_x, mean_y, var_x, var_y, frame_num);
-				iTrack = xyTracks.erase(iTrack);
-				continue;
+				iTrack->addPoint(point);
+
+				
+				// if the trajectory achieves the maximal length
+				if(iTrack->index >= trackInfo.length)
+				{
+					// draw the trajectories at the first scale
+					if(show_track == 1)
+						DrawTrack(iTrack->point, iTrack->index, 1.0, 10, image);
+
+					std::vector<Point2f> trajectory(trackInfo.length+1);
+
+					for(int i = 0; i <= trackInfo.length; ++i)
+						trajectory[i] = iTrack->point[i];
+
+					float mean_x(0), mean_y(0), var_x(0), var_y(0), length(0);
+					
+					if(IsValid(trajectory, mean_x, mean_y, var_x, var_y, length))
+					{                       
+						// Here we are trying to segment trajectories belonding to hands
+						if(var_x > var_threshold || var_y > var_threshold)
+						{							
+							SaveTrackPoints(iTrack->point, trajectory, trackInfo.length, mean_x, mean_y, var_x, var_y, frame_num);
+
+							iTrack->tracking = false;
+							iTrack->frame_num = frame_num;
+							iTrack->mean_x = mean_x;
+							iTrack->mean_y = mean_y;
+							iTrack->trajectory = trajectory;
+						}
+					}
+					
+					if(iTrack->tracking)
+						iTrack = xyTracks.erase(iTrack);
+				}
 			}
-			          
 		}
 
 		if(init_counter != trackInfo.gap)
@@ -162,7 +172,8 @@ int main(int argc, char** argv)
 		// detect new feature points every initGap frames
 		std::vector<Point2f> points(0);
 		for(std::list<Track>::iterator iTrack = xyTracks.begin(); iTrack != xyTracks.end(); iTrack++)
-			points.push_back(iTrack->point[iTrack->index]);
+			if(iTrack->tracking == true)
+				points.push_back(iTrack->point[iTrack->index]);
  
 
 		DenseSample(grey, points, quality, min_distance);
@@ -189,23 +200,15 @@ int main(int argc, char** argv)
 
 		}
 	}
-/*
-	for (std::list<Track>::iterator iTrack = xyTracks.begin(); iTrack != xyTracks.end();)
-	{
-		std::vector<Point2f> trajectory(0);
 
-		for(int i = 0; i <= iTrack->point.size(); ++i)
-			trajectory.push_back(iTrack->point[i]);
+	// Remove trajectories which not reached the needed length
+	for(std::list<Track>::iterator iTrack = xyTracks.begin(); iTrack != xyTracks.end(); iTrack++)
+			if(iTrack->tracking)
+				iTrack = xyTracks.erase(iTrack);
 
-		float mean_x(0), mean_y(0), var_x(0), var_y(0), length(0);
-		
-		if(IsValid(trajectory, mean_x, mean_y, var_x, var_y, length))
-		{                       
-			SaveTrackPoints(iTrack->point, trajectory, trajectory.size(), mean_x, mean_y, var_x, var_y, frame_num, 1.0);
-		}
-		++iTrack;
-	}
-*/
+	ComputeTrajGraphs(xyTracks, trackInfo.length);
+
+
 	if( show_track == 1 )
 		destroyWindow("DenseTrack");
 

@@ -88,11 +88,16 @@ public:
     int index;
     bool tracking;
 
+    int frame_num;
+    float mean_x;
+    float mean_y;
+    std::vector<Point2f> trajectory;
+
     Track(const Point2f& point_/*, const TrackInfo& trackInfo, const DescInfo& hogInfo,
           const DescInfo& hofInfo, const DescInfo& mbhInfo*/)
         /*: point(trackInfo.length+1), hog(hogInfo.dim*trackInfo.length),
           hof(hofInfo.dim*trackInfo.length), mbhX(mbhInfo.dim*trackInfo.length), mbhY(mbhInfo.dim*trackInfo.length)*/
-    {
+    {        
         tracking = true;
         point.push_back(point_);
     }

@@ -1,4 +1,4 @@
-#use python otsu_thresholding.py -v ./sing.webm -f ./out_of_tracks.txt -s 3 -t10
+#use python otsu_thresholding.py -v ./consulting.mp4 -f ./out_of_tracks.txt -s 3 -t 2
 
 import numpy as np
 import cv2
