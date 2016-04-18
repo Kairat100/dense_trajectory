@@ -44,6 +44,8 @@ void InitDescInfo(DescInfo* descInfo, int nBins, bool isHof, int size, int nxy_c
 
 void InitSeqInfo(SeqInfo* seqInfo, char* video)
 {
+	seqInfo->video = video;
+
 	VideoCapture capture;
 	capture.open(video);
 

@@ -206,7 +206,7 @@ int main(int argc, char** argv)
 			if(iTrack->tracking)
 				iTrack = xyTracks.erase(iTrack);
 
-	ComputeTrajGraphs(xyTracks, trackInfo.length);
+	ComputeTrajGraphs(xyTracks, trackInfo.length, &seqInfo);
 
 
 	if( show_track == 1 )

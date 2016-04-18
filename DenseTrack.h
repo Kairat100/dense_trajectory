@@ -51,6 +51,7 @@ typedef struct {
     int width;   // resolution of the video
     int height;
     int length;  // number of frames
+    char* video;
 }SeqInfo;
 
 typedef struct {
