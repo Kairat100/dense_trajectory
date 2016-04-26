@@ -154,9 +154,6 @@ int main(int argc, char** argv)
 
 							iTrack->tracking = false;
 							iTrack->frame_num = frame_num;
-							iTrack->mean_x = mean_x;
-							iTrack->mean_y = mean_y;
-							iTrack->trajectory = trajectory;
 						}
 					}
 					

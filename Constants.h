@@ -2,24 +2,37 @@
 #define CONSTANTS_H_
 
 // the length of frames to be computed as one step for trajectory similarity
-const int step = 5;
+const int step = 6;
 
 // Variance threshold is used to segment trajectories of hands by variance
 const float var_threshold = 12;
 
-// difference between dx and dy of points of trajectories
-const float delta_dis_d = 0.3;
+// difference between variances of trajectories
+const float delta_var = 8;
+const float delta_mean = 30;
+const float delta_angle = 4;
+
+// difference between displacement of coordinates of x and y of points of trajectories
+const float delta_dis_d = 0.1;
 // difference between coordinates of x and y of points of trajectories
 const float delta_dis = 15;
 
 
 // colors
 const int colors[50][3] = 
-{{233,56,157},
+{
+/*{233,56,157},
 {85,209,62},
 {227,99,222},
 {153,202,45},
-{155,122,239},
+{155,122,239},*/
+
+{94,173,83},
+{199,99,172},
+{183,149,45},
+{109,138,196},
+{208,85,72},
+
 {66,158,43},
 {200,122,221},
 {194,188,52},

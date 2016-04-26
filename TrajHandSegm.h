@@ -12,20 +12,14 @@ public:
     vector<Point2f> point;
     vector<Point2f> trajectory;
 
-    //int index = -1;
-
     int frame_num;
-    //float mean_x;
-    //float mean_y;
-    
-    /*TrackSegm(const Point2f& point_)
-    {        
-        //point.push_back(point_);
-    }*/
+    float mean_x;
+    float mean_y;
+    float var_x;
+    float var_y;
 
     void addPoint(const Point2f& point_)
     {
-        //index++;
         point.push_back(point_);        
     }
 
@@ -38,6 +32,18 @@ public:
     {
     	frame_num = frame;
     }
+
+    void setMean(float m_x, float m_y)
+    {
+    	mean_x = m_x;
+    	mean_y = m_y;
+    }
+
+    void setVariance(float v_x, float v_y)
+    {
+    	var_x = v_x;
+    	var_y = v_y;
+    }
 };
 
 list<TrackSegm> ExtractTrajectories(list<Track> xyTracks, int frame_num, int length)
@@ -49,19 +55,22 @@ list<TrackSegm> ExtractTrajectories(list<Track> xyTracks, int frame_num, int len
 		if(frame_num <= iTrack->frame_num && iTrack->frame_num <= frame_num + length - step)
 		{
 			TrackSegm track;
-			track.setFrameNum(iTrack->frame_num);
+			track.setFrameNum(iTrack->frame_num);			
 
 			int shift = iTrack->frame_num - frame_num;
 			int index = length - shift - step;
+			vector<Point2f> trajectory(step);
 
-			for(int i = index; i < index + step; i++)
+			for(int i = index, j = 0; i <= index + step; i++, j++)
 			{
 				track.addPoint(iTrack->point[i]);
-				track.addTrajectory(iTrack->trajectory[i]);
+				trajectory[j] = iTrack->point[i];
 			}
 
-			// add last point
-			track.addPoint(iTrack->point[index + step]);
+			float mean_x(0), mean_y(0), var_x(0), var_y(0), length(0);
+			IsValid(trajectory, mean_x, mean_y, var_x, var_y, length);
+			track.setMean(mean_x, mean_y);
+			track.setVariance(var_x, var_y);
 
 			segmTracks.push_back(track);
 		}		
@@ -93,6 +102,7 @@ void DrawTrajetory(const std::vector<Point2f>& point, Mat& image, int index)
 
 		//line(image, point0, point1, Scalar(colors[index][0],cvFloor(colors[index][1]*(j+1.0)/float(step+1.0)),colors[index][2]), 1, 8, 0);
 		line(image, point0, point1, Scalar(colors[index][0], colors[index][1], colors[index][2]), 1, 8, 0);
+		//circle(image, point0, 1, Scalar(colors[index][0], colors[index][1], colors[index][2]), -1, 8, 0);
 		point0 = point1;
 	}
 }
@@ -117,16 +127,23 @@ void DrawTrajetories(SeqInfo* seqInfo, list<TrackSegm> segmTracks, int indexOfMa
         if(frame.empty())
             break;
 
-        if(indexOfMax == frame_num)
+        if(indexOfMax - stepmake == frame_num)
         {
         	// draw all segmented trajectories
         	int index = 0;
+        	int sum = 0;
 		    for(list<TrackSegm>::iterator iTrack = segmTracks.begin(); iTrack != segmTracks.end(); iTrack++)
 		    {
-		    	DrawTrajetory(iTrack->point, frame, clusters[index]);
+		    	//if(clusters[index] == 3)
+		    	//{
+		    		DrawTrajetory(iTrack->point, frame, clusters[index]);
+		    	//	printf("Variance of x: %f, Variance of y: %f\n", iTrack->var_x, iTrack->var_y);
+		    	//	sum++;
+		    	//}
 		    	index++;
 		    }
 
+		    //printf("Number of trajectories in the cluster: %d\n", sum);
 			imshow( "SegmentedTrajectories", frame);
 			break;
         }
@@ -138,26 +155,19 @@ void DrawTrajetories(SeqInfo* seqInfo, list<TrackSegm> segmTracks, int indexOfMa
     destroyWindow("SegmentedTrajectories");
 }
 
-bool DoesTrajSame(vector<Point2f> point1, vector<Point2f> trajectory1, vector<Point2f> point2, vector<Point2f> trajectory2)
+bool DoesTrajSame(list<TrackSegm>::iterator track0, list<TrackSegm>::iterator track1)
 {
 	bool issame = true;
 
-	trajectory1[0].x;
+	if(	abs(track0->var_x - track1->var_x) > delta_var || abs(track0->var_y - track1->var_y) > delta_var)
+	{
+		issame = false;
+	}
 
-	for(int i = 0; i < trajectory1.size(); i++)
-		if(	abs(trajectory1[i].x - trajectory2[i].x) > delta_dis_d || abs(trajectory1[i].y - trajectory2[i].y) > delta_dis_d)
-		{
-			issame = false;
-			break;
-		}
-	
-	if(issame)
-		for(int i = 0; i < point1.size(); i++)
-			if(	abs(point1[i].x - point2[i].x) > delta_dis || abs(point1[i].y - point2[i].y) > delta_dis)
-			{
-				issame = false;
-				break;
-			}
+	if(	abs(track0->mean_x - track1->mean_x) > delta_mean || abs(track0->mean_y - track1->mean_y) > delta_mean)
+	{
+		issame = false;
+	}
 
 	return issame;
 }
@@ -188,8 +198,10 @@ void BFS(int** arr, bool* visited, int* clusters, int size, int unit, int clus)
 	delete []queue;
 }
 
-int* GetMatrixOfTrajectories(list<TrackSegm> segmTracks, int size)
+int* GetMatrixOfTrajectories(list<TrackSegm> segmTracks)
 {
+	int size = segmTracks.size();
+
 	// create double array of zeros
 	int** arr = 0;
 	arr = new int*[size];
@@ -214,7 +226,7 @@ int* GetMatrixOfTrajectories(list<TrackSegm> segmTracks, int size)
 		for(list<TrackSegm>::iterator iTrack1 = segmTracks.begin(); iTrack1 != segmTracks.end(); iTrack1++)
 		{
 			if(j > i)
-				if(DoesTrajSame(iTrack0->point, iTrack0->trajectory, iTrack1->point, iTrack1->trajectory))
+				if(DoesTrajSame(iTrack0, iTrack1))
 					arr[i][j] = 1;
 
 			j++;
@@ -254,6 +266,8 @@ int* GetMatrixOfTrajectories(list<TrackSegm> segmTracks, int size)
 		}
 	}
 
+	printf("Number of clusters: %d\n", clus);
+
 	// Clean up memory
 	for (int i = 0; i < size; i++)
 		delete []arr[i];
@@ -263,6 +277,87 @@ int* GetMatrixOfTrajectories(list<TrackSegm> segmTracks, int size)
 	arr = 0;	
 
 	return clusters;
+}
+
+int OtsuThresholding(int* histogram, int size, int total)
+{
+	int _sum = 0;
+
+	for (int i = 0; i < size; ++i)
+		_sum += i * histogram[i];
+
+	int sumB = 0, wB = 0, wF = 0, _max = 0, threshold = 0;
+	float mB = 0.0, mF = 0.0, between = 0.0;
+	
+	for (int i = 0; i < size; ++i)
+	{
+		wB += histogram[i];
+		if (wB == 0)
+			continue;
+
+		wF = total - wB;
+		if (wF == 0)
+			break;
+
+		sumB += i * histogram[i];
+		mB = sumB / wB;
+		mF = (_sum - sumB) / wF;
+
+		between = wB * wF * pow(mB - mF, 2);
+		if (between > _max)
+		{
+			_max = between;
+			threshold = i;
+		}
+	}
+
+	return threshold;
+}
+
+list<TrackSegm> Thresholding(list<TrackSegm> segmTracks)
+{
+	int max = 0;
+
+	for(list<TrackSegm>::iterator iTrack = segmTracks.begin(); iTrack != segmTracks.end(); iTrack++)
+	{
+		int num = iTrack->var_x * iTrack->var_y;
+		if (num > max)
+		{
+			max = num;
+		}
+	}
+
+	//printf("Maximum number: %d\n", max);
+	
+	int* histogram = new int[max];
+	for (int i = 0; i < max; ++i) histogram[i] = 0;
+
+	for(list<TrackSegm>::iterator iTrack = segmTracks.begin(); iTrack != segmTracks.end(); iTrack++)
+	{
+		int num = iTrack->var_x * iTrack->var_y;
+		histogram[num]++;
+	}
+
+	int threshold = OtsuThresholding(histogram, max, segmTracks.size());
+
+	printf("threshold: %d\n", threshold);
+
+	list<TrackSegm> segmTracks_thresholded;
+
+	while (!segmTracks.empty())
+	{
+		TrackSegm iTrack = segmTracks.back();
+		segmTracks.pop_back();
+		
+		int num = iTrack.var_x * iTrack.var_y;
+		
+		if(num >= threshold)
+			segmTracks_thresholded.push_back(iTrack);
+	}
+
+	delete []histogram;
+
+	return segmTracks_thresholded;
 }
 
 void ComputeTrajGraphs(list<Track> xyTracks, const int length, SeqInfo* seqInfo)
@@ -287,8 +382,10 @@ void ComputeTrajGraphs(list<Track> xyTracks, const int length, SeqInfo* seqInfo)
 	printf("Maximum number of traj: %d, at index: %d \n", maxnum, indexOfMax);
 
 	// list of trajectories which was segmented and ready for graph algorithm 
-	list<TrackSegm> segmTracks = ExtractTrajectories(xyTracks, indexOfMax, length);
-	printf("Size of list: %d \n", segmTracks.size());	
+	list<TrackSegm> segmTracks = ExtractTrajectories(xyTracks, indexOfMax, length);	
+
+	//segmTracks = Thresholding(segmTracks);
+
 	/*
 	for(list<TrackSegm>::iterator iTrack = segmTracks.begin(); iTrack != segmTracks.end(); iTrack++)
 	{
@@ -297,11 +394,11 @@ void ComputeTrajGraphs(list<Track> xyTracks, const int length, SeqInfo* seqInfo)
 			printf("%f,\t%f;\t", iTrack->trajectory[i].x, iTrack->trajectory[i].y);
 		}		
 		printf("\n");
-	}*/	
+	}
+	*/
 
-	// compute the matrix of connections between segmented trajectories
-	int* clusters = GetMatrixOfTrajectories(segmTracks, maxnum);
-	printf("Number of clusters: %d \n", sizeof(clusters));
+	// compute the matrix of connections between segmented trajectories and cluster them
+	int* clusters = GetMatrixOfTrajectories(segmTracks);	
 
 	// draw segmented trajectories
 	DrawTrajetories(seqInfo, segmTracks, indexOfMax, clusters);
